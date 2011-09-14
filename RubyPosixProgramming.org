@@ -219,6 +219,28 @@ There are many filesystem operations defned to be atomic in POSIX. These are
 ideal for helping multiple processes interact with each other
 safely. Unfortunately, they also make POSIX-compliance difficult for
 implementations of network and distributed filesystems.
+* System Calls in Unix
+Syscalls are the interface that user space uses to interact with kernel
+space. When a user space application makes a syscall, it's telling the kernel to
+execute code on its behalf.
+
+Ruby provides a global "syscall" method on many platforms. It's useful for
+learning and experimentation, but not recommended for general use as it is
+fragile and non-portable. There is usually no need to use this method as many
+useful syscalls are already provided and wrapped by Ruby methods.
+
+For a user space application to make a system call, architechture and
+OS-dependent code must be invoked. At the lowest userspace levels, this is
+implemented in non-portable assembly code.
+
+Fortunately, most system calls are already provided as wrappers by the system C
+library[fn:10] so they appear to user space as portable C functions. Ruby wraps
+these C functions as Ruby methods. Even non-C Ruby implementations are likely to
+call the functions in libc rather than implement the assembly themselves.
+
+Thus, IO.pipe in Ruby is a wrapper for the [[shell:man%203%20pipe][pipe(3)]] C function which wraps the
+[[shell:man%202%20pipe][pipe(2)]] system call. You might not have the [[shell:man%203%20pipe][pipe(3)]] manpage, since it's a very
+thin wrapper for [[shell:man%202%20pipe][pipe(2)]], which has an equivalent manpage.
 * Footnotes
 [fn:1] or more
 
