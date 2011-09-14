@@ -1,3 +1,5 @@
+* License:
+[[http://www.gnu.org/licenses/gpl-3.0.txt][GPLv3]] (or later, at the discretion of Eric Wong)
 * Prerequisite Knowledge / Conventions used
 ** Prerequisite Knowledge
 + You should know basic Ruby syntax.
@@ -239,5 +241,5 @@ Ruby VMs within a single process
 [fn:8] among others
 
 [fn:9] including pseudo
-* License:
-[[http://www.gnu.org/licenses/gpl-3.0.txt][GPLv3]] (or later, at the discretion of Eric Wong)
+
+[fn:10] libc
