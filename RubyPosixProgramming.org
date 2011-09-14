@@ -1,0 +1,243 @@
+* Prerequisite Knowledge / Conventions used
+** Prerequisite Knowledge
++ You should know basic Ruby syntax.
++ Bourne shell knowledge will be useful, but not required.
++ You do not need to know C, though it will be referred to and Ruby methods will
+  be mapped to corresponding or analogous C functions.
++ You must know that two[fn:1] variables in Ruby can refer to the same
+  object. This concept is present in Unix, so it is *very* important to
+  understand the following:
+
+  #+begin_src ruby
+    a = "this is a string"
+    b = a    # 'b' refers to the same String object
+    a << "!" # modifies the String object 'a' points to
+
+    "this is a string!" == a
+
+    # You should understand why the following statements are true:
+    "this is a string!" == b
+    "this is a string" != b
+  #+end_src
+** Notations / Conventions
+*** Ruby method documentation references
+should be the same as Ruby documentation
+
++ IO.pipe :: class/singleton method
++ IO#stat :: instance method
+*** C function documentation references
+
++ pipe(2) :: "#{function_name}(#{section})"
+             The C function manpage can be accessed as:
+               man #{section} #{function_name}
+             so [[shell:man%202%20pipe][man 2 pipe]] for pipe(2)
+* A Fluffy Introduction to Unix Systems Programmng in Ruby
+** What is Unix?
+Unix is an operating system originally developed at Bell Labs n 1969. Numerous
+versions and clones ("Unix-like" systems) have been released over the decades as
+the Unix family continues to evolve. Nowadays, POSIX is the set of standards
+that attempt to define the interfaces of Unix and Unix-like systems[fn:2].
+
+Modern Unix systems have two distinct software layers, user space and kernel
+space, which layer like so:
+
+User space   (user applications, where Ruby runs)
+--------------------------------------------------
+Kernel space (schedulers, sockets, pipes, VFS ...)
+--------------------------------------------------
+Hardware     (disks, network cards, memory)
+
+The kernel acts as a mediator for user space and the underlying hardware.
+** What is Unix systems programmng?
+Unix and Unix-like operating systems share a set of common programming
+interfaces for user space to interact with the kernel, and in turn
+hardware. These interfaces are referred to as "system calls"[fn:3] or
+"syscalls".
+
+We'll be interacting with Unix and Unix-like operating systems using the Ruby
+programming language.
+
+Unix systems programming is often thought of as "plumbing" as it deals with
+basic infrastructure and data flow in and out of the system.
+** Why Unix?
+Unix and Unix-like systems are everywhere. From traditional deployments on
+workstations and servers, to smartphones and tablets, Unix and its clones have
+become pervasive in the world of computing over the past four decades and are
+showing no sign of decline.
+
+Many implementations of Unix and its clones are free[fn:4], so it's readily
+available for anybody with the time and will to study.
+
+The design of Unix is minimalist and simple. While there have been undeniable
+missteps and embarassing mistakes over the years, its systems programming
+interface remains absolutely consistent and straightforward.
+** Why systems programming?
+Knowledge of systems programming is often useful for understanding,
+troubleshooting and debugging problems in high-level applications. *Lack* of
+systems programming knowledge and understanding can cause problems in both the
+design and implementation of applications.
+
+Unix systems programming knowledge transcends programming languages. As long as
+an application runs on a Unix-like system, Unix systems programming knowledge
+will be useful for implementing, improving, and troubleshooting applications.
+** Why Ruby?
+Traditionally, Unix systems programming is taught in C, but high-level languages
+like Perl, Python and Ruby can access most of the same Unix APIs available to C
+programmers.
+
+Unlike C, Ruby is a very forgiving language. There is no pointer manipulation
+and no manual memory management. The Rubyist does not need to worry about many
+common bugs found in C code.
+
+Error handling is also enforced in Ruby. While C programmers should check for
+errors on every syscall, Rubyists have SystemCallExceptions(Errno::*) thrown in
+their face when errors are encountered.
+
+As far as the author knows, there is little documentation on Unix systems
+programming in Ruby (or languages other than C for that matter). Given the
+prevalance of programmers working in high-level languages that do not know C,
+Unix systems programming knowledge may have been off limits to many.
+
+* The Unix Object Model (as seen from user space)
+A running Unix/Unix-like kernel exposes two primary types of object to
+userspace, Processes and Open Files.
+** Processes
+Processes are instances of running applications. Ruby programs typically run as
+their own process[fn:5] in userspace.
+
+Kernels expose a Process IDentfier (PID) as positive integers to userspace
+programs so they can be uniquely identified. Each PID represents one (private)
+process object in the kernel. The PID is just a reference or ponter to that
+object. Two running processes cannot have the same PID, and two PIDs cannot
+refer to the same process, but PIDs can be recycled and reused over time.
+
+PIDs are global in scope to each running Unix system.
+
+Processes are created from their parent using the [[shell:man%202%20fork][fork(2)]] system call. Ruby
+wraps this method in Kernel#fork.
+** Open Files
+Running processes may create, open, and release objects known as "files" in
+kernel space usng the APIs provided in user space. Much of Unix systems
+programmng revolves around manipulating "file" objects of various types.
+
+The kernel exposes non-negative integers known as "file descriptors" to
+userspace. These are similar to PIDs as they are integers which point to objects
+within the kernel.
+
+One of the design goals of Unix was "everything is a file", and indeed each file
+descriptor may refer to one of several types of objects within a running
+kernel. All of these objects can be called "files" regardless of them being
+stored on hard disks or visible on the filesystem.
+
+File descripters may be reused and recycled within the lifetime of a
+process. They are more frequently recycled than PIDs.
+
+Each process has its own file descriptor table, inherited from its parent.
+
+Unlike PIDs, several file descriptors may refer to the same file object inside
+the kernel.
+
+File descriptors have properties of their own that are not tied to the
+underlying file object in the kernel.
+
+Open files are the primary interface for processes to interact with the kernel.
+** Summary
+Processes are containers for open files, among other thngs. Open files are
+objects in the Unix kernel that can be accessed from within processes.
+* An Overview of the Unix Filesystem
+Unix has a heirarchical filesystem visible to all running processes, and it is
+the primary shared namespace within a Unix system.
+
+The top (or root) of this namespace starts at "/", and subdirectories may be
+created under it, each path component separated by "/".
+
+Filesystems may contain other filesystems. The root filesystem on a modern Unix
+almost always contans other filesystems.
+
+Filesystems may have several types of files:
+
++ directories
++ symlinks
++ UNIX domain sockets
++ FIFOs
++ character devices
++ block devices
++ "regular" files
+
+
+Traditional filesystems are backed by stable storage (hard drives, SSD) and
+persist across reboots and shutdowns. Some of these are designed for Unix and
+are considered POSIX-compliant, while others were designed for other OSes and
+are incompatible with POSIX to various degrees.
+
+Various pseudo-filesystems exist, but they are mostly non-standardized. Among
+pseudo-filesystems, there are:
+
++ memory-only filesystems
++ network filesystems
++ proc (process information) filesystems
++ device filesystems
++ filesystems for tuning/inspecting the kernel and hardware
+
+
+Pseudo-filesystems allow Unix-based OSes to avoid implementng system calls only
+useful within a limited scope.
+
+The "everything-is-a-file" design and use of filesystems[fn:6] allows a few
+system calls to be useful for multiple purposes. This consistency improves the
+user experience by reducing the amount a systems programmer needs to know, and
+also improving the discoverability of the interfaces.
+
+As the amount of system calls is relatively small, learning Unix systems
+programming should be easier than in other operating systems.
+
+Plan 9[fn:7] takes "everything-is-a-file" more literally to further minimize the
+need for specialized system calls. This Plan 9 idea[fn:8] is being co-opted into
+existing userspaces and operating systems.
+
+* Traditional Unix Filesystem Behavior
+POSIX-compliant filesystems are the standard, other[fn:9] filesystems attempt to
+expose a user-interface simlar to those in POSIX-compliant
+filesystems. Unfortunately, this means there are sometimes leaky, incompatible,
+and even dangerous abstractions that may be present.
+
+Unix filesystems are byte-oriented. They have no notion of encodings, and thus
+cannot be case-insensitive. They do not normalize path names or data in any
+way. The lack of conversion and normalization makes path lookup operations fast.
+
+In a path name, only the "\0" byte is disallowed. The "/" byte is used to
+delimit directores, so it may not exist in a path component itself. Otherwise,
+path names may contain any other value.
+
+Regular files will store any bnary data stream without altering it in the
+kernel. Filesystem operations have no notion of "lines" and won't convert CRLF
+line endings to LF or vice-versa.
+
+There are many filesystem operations defned to be atomic in POSIX. These are
+ideal for helping multiple processes interact with each other
+safely. Unfortunately, they also make POSIX-compliance difficult for
+implementations of network and distributed filesystems.
+* Footnotes
+[fn:1] or more
+
+[fn:2] however, "POSIX-compliant" does not guarantee a system is Unix or even
+"Unix-like". Old Unix systems are not "POSIX-compliant" either.
+
+[fn:3] This is *not* the Kernel#system method in ruby, nor the corresponding C
+library [[shell:man%203%20system][system(3)]] function! In fact, the ruby module "Kernel" has little to do
+with operating system kernels.
+
+[fn:4] as in beer and in speech
+
+[fn:5] although experimental Multi-VM implementations exist that allow multiple
+Ruby VMs within a single process
+
+[fn:6] even for non-storage tasks
+
+[fn:7] the intended successor to Unix
+
+[fn:8] among others
+
+[fn:9] including pseudo
+* License:
+[[http://www.gnu.org/licenses/gpl-3.0.txt][GPLv3]] (or later, at the discretion of Eric Wong)
