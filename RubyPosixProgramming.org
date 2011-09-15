@@ -241,7 +241,61 @@ call the functions in libc rather than implement the assembly themselves.
 Thus, IO.pipe in Ruby is a wrapper for the [[shell:man%203%20pipe][pipe(3)]] C function which wraps the
 [[shell:man%202%20pipe][pipe(2)]] system call. You might not have the [[shell:man%203%20pipe][pipe(3)]] manpage, since it's a very
 thin wrapper for [[shell:man%202%20pipe][pipe(2)]], which has an equivalent manpage.
+* *Avoiding* System Calls
+The mode switch from user space to kernel space has more overhead and is slower
+than a normal library function call[fn:11], thus user space can (and will often
+attempt to) aggregate several user space calls into fewer system calls to avoid
+the switching overhead.
+
+This is a common concept in user space code, and Ruby is no excepton. This
+aggregation does not happen transparently, so it should be understood and
+explained to avoid confusion.
+** I/O Buffering
+As a Ruby programmer, you'll notice the IO class[fn:12] will buffer data you
+write and you need to call "IO#flush" or set "IO#sync = true" to ensure other
+processes can read it.
+
+If you're a C programmer, you'll know the stdio library can do the same type of
+buffering in user space. In fact, MRI 1.8 used the stdio library internally for
+its user space buffering needs.
+
+Kernel space may also implement its own buffering to avoid overhead when
+interacting with the storage and network layers. This buffering can sometimes be
+influenced from Ruby
+** Memory Allocation
+While Ruby programmers do not often worry about memory allocation, sometimes the
+following question comes up:
+
+#+begin_quote
+Why did my Ruby process stay so big even after I've cleared all references to
+big objects? I'm *sure* GC has run several times and freed my big objects and
+I'm not leaking memory.
+#+end_quote
+
+A C programmer might ask the same question:
+
+#+begin_quote
+I free()-ed a lot of memory, why is my process still so big?
+#+end_quote
+
+Memory allocation to user space from the kernel is cheaper in large chunks, thus
+user space avoids interaction with the kernel by doing more work itself.
+
+User space libraries and runtimes implement a memory allocator[fn:13] which
+takes large chunks of memory[fn:14] and divides them up into smaller pieces for
+user space applications to use.
+
+Thus, several user space memory allocations may occur before user space needs to
+ask the kernel for more memory. Thus, f you got a large chunk of memory from the
+kernel and are only using a small part of that, that large chunk of memory
+remains allocated.
+
+Releasing memory back to the kernel also has a cost. User space memory
+allocators may privately hold onto that memory in the hope it can be reused
+within the same process and not give it back to the kernel for use in other
+processes.
 * Footnotes
+
 [fn:1] or more
 
 [fn:2] however, "POSIX-compliant" does not guarantee a system is Unix or even
@@ -265,3 +319,11 @@ Ruby VMs within a single process
 [fn:9] including pseudo
 
 [fn:10] libc
+
+[fn:11] explaining why this is so expensve is left as an exercise for the reader
+
+[fn:12] and subclasses like File
+
+[fn:13] e.g.: [[shell:man%203%20malloc][malloc(3)]] in libc
+
+[fn:14] via [[shell:man%202%20brk][brk(2)]], [[shell:man%202%20sbrk][sbrk(2)]], [[shell:man%202%20mmap][mmap(2)]], or various non-portable methods.
