@@ -294,8 +294,46 @@ Releasing memory back to the kernel also has a cost. User space memory
 allocators may privately hold onto that memory in the hope it can be reused
 within the same process and not give it back to the kernel for use in other
 processes.
-* Footnotes
+* The Ruby IO Class
+The IO class wraps file descriptors as Ruby objects and provides instance
+methods which wrap system calls. Each IO object wraps one OS file
+descriptor[fn:15]. IO also provides userspace buffering to avoid system calls
+and utility methods to make a programmer's life easier.
 
+C programmers may find the Ruby IO class analogous to the opaque "FILE" struct
+in the stdio.
+
+IO is often used via subclasses:
+
++ File is mostly intended for regular files
++ TCPSocket for TCP sockets
++ UNIXSocket for UNIX domain sockets
++ UDPSocket for UDP sockets
++ and so on
+
+
+All of those classes are based on the IO class and wrap an integer file
+descriptor.
+** Layers of Buffering
+There are at least four distinct layers of buffering within a machine.
+
+Application buffers - what your application sees
+Library buffers     - implemented by Ruby or libc
+------------ kernel-userspace boundary ----------
+Kernel software buffers
+Kernel hardware buffers
+
+Buffers may be implemented for both reading and writing.
+
+The Ruby IO class can do the following:
+
++ accept application buffers from the user (IO#write)
++ return application buffers to the user (IO#read)
++ manage library buffers internally
++ copy (and remove) library buffers to kernel buffers
++ attempt to force kernel and hardware buffers to storage or network
+
+* Footnotes
 [fn:1] or more
 
 [fn:2] however, "POSIX-compliant" does not guarantee a system is Unix or even
@@ -327,3 +365,6 @@ Ruby VMs within a single process
 [fn:13] e.g.: [[shell:man%203%20malloc][malloc(3)]] in libc
 
 [fn:14] via [[shell:man%202%20brk][brk(2)]], [[shell:man%202%20sbrk][sbrk(2)]], [[shell:man%202%20mmap][mmap(2)]], or various non-portable methods.
+
+[fn:15] Multiple IO objects may wrap a sngle file descriptor, but that can be a
+bad idea.
