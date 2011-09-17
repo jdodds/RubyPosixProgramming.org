@@ -332,6 +332,30 @@ The Ruby IO class can do the following:
 + manage library buffers internally
 + copy (and remove) library buffers to kernel buffers
 + attempt to force kernel and hardware buffers to storage or network
+* The Unix Object Model (as seen in procfs)
+Several filesystems have a procfs virtual filesystem mounted under [[file:/proc][/proc]],
+although it doesn't seem to be standardized anywhere.
+
+Among other things, procfs lets you see the relationship between process and
+their file descriptors on the filesystem.
+
+You can inspect which file descriptors a particular process is using by looking
+in the "fd" subdirectory belonging to the PID of the process. For example, a
+mutt process with PID 19245 and file descriptors 0, 1, 2, and 4 open would look
+like this:
+
+  /proc/19245/fd
+  /proc/19245/fd/0
+  /proc/19245/fd/1
+  /proc/19245/fd/2
+  /proc/19245/fd/4
+
+Each PID has a directory in [[file:/proc][/proc]], and in each PID's directory there is an "fd"
+folder.
+
+Utilities like [[sh:man%201%20ps][ps(1)]] are likely to use information used in procfs to generate
+their outpt. Other information in procfs is not consistent across
+implementations, so consult your OS documentation for full details.
 
 * Footnotes
 [fn:1] or more
