@@ -332,6 +332,33 @@ The Ruby IO class can do the following:
 + manage library buffers internally
 + copy (and remove) library buffers to kernel buffers
 + attempt to force kernel and hardware buffers to storage or network
+
+
+A wider view of the above table would be:
+
+process0    | process 1   | process 2
+------------+-------------+------------
+App buffers | App buffers | App buffers
+Lib buffers | Lib buffers | Lib buffers
+------kernel-user space boundary-------
+Kernel software buffers
+Hardware buffers
+
+User space buffers are not shared between different processes in Ruby.
+
+Kernel buffers are shared, allowing [[man%202%20read][read(2)]]-after-[[man%202%20write][write(2)]] consistency between
+different processes. This is one of many ways for cooperating processes to share
+data.
+
+A few applcations[fn:16] may manage processe-shared buffers in user space, but
+stock Ruby does not do this.
+
+Library buffers (like most memory) in the Ruby IO class *are* shared between
+different Threads and Fibers in Ruby.
+
+Sharing of application buffers between Threads and Fibers is possible, but
+usually not a good idea.
+
 * The Unix Object Model (as seen in procfs)
 Several filesystems have a procfs virtual filesystem mounted under [[file:/proc][/proc]],
 although it doesn't seem to be standardized anywhere.
@@ -423,3 +450,5 @@ Ruby VMs within a single process
 
 [fn:15] Multiple IO objects may wrap a sngle file descriptor, but that can be a
 bad idea.
+
+[fn:16] database servers like PostGreSQL come to mind
