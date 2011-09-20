@@ -415,6 +415,84 @@ or [[shell:man%202%20write][write(2)]], and will also raise on errors.
 Mixing sys* and non-sys* methods is not recommended and will result in errors or
 exceptions.
 
+* Regular Files and Metadata
+Regular files on a persistent filesystem are pointers or links to internal
+metadata known as inodes. The implementation details of inodes varies between
+various filesystems and is usually not the concern of user space. User space
+developers should only need to know a few common traits about inodes
+** device number (File::Stat#dev)
+The device number is a unique integer identifier for the device an inode belongs
+to. Each file system partition is considered its own "device", so a device
+number does not necessarily correspond to a physical device.
+
+A device number is unique within a running Unix system, no two "devices" may
+have the same device number at the same time.
+** inode number (File::Stat#ino)
+The inode number is a unique integer identifier for an inode within a particular
+device. Like PIDs, FDs, and device numbers, they are opaque pointers to complex
+objects in kernel space.
+
+The combination of device and inode number is required to uniquely identify any
+inode (and thus file) in the system
+** File Names
+In many cases, there is a 1:1 relationship between file names and inodes. That
+is, each file name points to its own inode, much like how one variable points to
+one ruby object:
+
+  ".bashrc" -> inode_number=123, device_number=456
+
+It is important to know the file name -> inode relationship is one way. Inodes
+do not know which file name(s) are pointing to them. Similarly, Ruby objects do
+not know which variable name(s) are assigned to them.
+
+When working with File objects, one should know that the File#path method return
+value in Ruby is determined in user space with File.open is called, *not* when
+File#path is called:
+
+#+begin_src ruby
+  file = File.open(".bashrc")
+  file.path  # returns value or ".bashrc" determined above
+#+end_src
+** Creating Inodes and Files
+Making the [[shell:man%202%20open][open(2)]] system call with the O_CREAT flag will create a file.
+
+File.open can accept the equivalent IO::CREAT constant, or [[man%203%20fopen][fopen(3)]]-style mode
+strings ("w", "a") to create an inode if the specified file name does not exist.
+
+The Unix [[shell:man%201%20touch][touch(1)]] command and FileUtils.touch method both create files with
+[[shell:man%202%20open][open(2)]] in this way. Historically there is also a [[shell:man%202%20creat][creat(2)]] system call for
+creating and opening files, but [[shell:man%202%20open][open(2)]] is more flexible and preferred. Ruby
+does not use nor expose [[man%202%20creat][creat(2)]] to the user.
+** Hard Links
+Since you should understand how two or more variables can point to the same
+object in Ruby, you should be able to understand how two or more file names can
+point to the same inode on one device.
+
+Like two variables pointing to the same Ruby object, two or more links pointing
+to the same inode are indistinguishable from each other. Hard links to existing
+files are created with the File.link method, which makes the [[shell:man%202%20link][link(2)]] system
+call. There is usually a system-dependent limit on the number of links to a
+particular inode -- File.link will raise Errno::EMLINK if this limit is hit.
+** Number of Hard Links (File::Stat#nlink)
+While inodes do not know which file names point to it, inodes are aware of how
+many file names point to it. Each time a hard link is created, the number of
+hard links to the referenced inode is incremented.
+
+File names may be removed with the [[man%202%20unlink][unlink(2)]] system call (via File.unlink in
+Ruby). Unlinking a file will decrement the number of links an inode has. It is
+possible for an inode to have zero links to it and still be valid.
+** File::Stat
+File::Stat is the Ruby class used to present inode information to the user. All
+of the fields mentioned above are available from a File::Stat object.
+
+File::Stat is a wrapper for the [[shell:man%202%20stat][stat(2)]] system call and returns a File::Stat
+object for a given path.
+
+If you have a Ruby IO object open, you can use IO#stat to get the File::Stat
+object for the file descriptor belonging to the IO/File object. IO#Stat makes
+the [[shell:man%202%20fstat][fstat(2)]] system call instead of [[shell:man%202%20stat][stat(2)]].
+
+File::Stat is the Ruby equivalent/wrapper of the "struct stat" seen by C programmers.
 * Footnotes
 [fn:1] or more
 
