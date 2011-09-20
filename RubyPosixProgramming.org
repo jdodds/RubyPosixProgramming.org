@@ -357,6 +357,37 @@ Utilities like [[sh:man%201%20ps][ps(1)]] are likely to use information used in 
 their outpt. Other information in procfs is not consistent across
 implementations, so consult your OS documentation for full details.
 
+* Basic IO Methods
+Consider C library functions (3) analogues, while the system call (2) functions
+(3) are inevitably called by Ruby
+** Opening and Closing Files
++ File.open :: [[shell:man%203%20fopen][fopen(3)]] which wraps [[shell:man%202%20open][open(2)]] and provides a File object
++ IO#close :: [[shell:man%203%20fclose][fclose(3)]], [[shell:man%202%20close][close(2)]] - Copies Ruby buffers to the kernel,
+              invalidates the IO object and releases the file descriptor so it
+              may be reused by the kernel.
+** Some File Operations for Reading and Writing
++ IO#read :: [[man%203%20fread][fread(3)]] - read all specified bytes
++ IO#write :: [[shell:man%203%20fwrite][fwrite(3)]] - write all specified bytes
++ IO#sync, IO#sync= :: [[shell:man%203%20setvbuf][setvbuf(3)]] controls Ruby write buffering
++ IO#flush :: [[shell:man%204%20fflush][fflush(3)]] - copies existing Ruby write buffers to kernel
++ IO#syswrite :: [[shell:man%202%20write][write(2)]] - copies application buffers to kernel
++ IO#sysread :: [[shell:man%202%20read][copies kernel buffers to application]]
+
+
+Setting IO#sync= to true will make IO#write copy application buffers directly
+into kernel buffers, bypassing Ruby buffers. IO#sync does not influence read
+buffering.
+
+If IO#sync is false, IO#write may copy small application buffers into Ruby
+buffers before doing IO#flush internally.
+
+The non-sys* methods will retry until the operation is complete, or raise on any
+errors. The sys* variants do not retry if the kernel returns a partial [[shell:man%202%20read][read(2)]]
+or [[shell:man%202%20write][write(2)]], and will also raise on errors.
+
+Mixing sys* and non-sys* methods is not recommended and will result in errors or
+exceptions.
+
 * Footnotes
 [fn:1] or more
 
