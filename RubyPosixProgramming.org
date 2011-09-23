@@ -607,8 +607,9 @@ guarantee entries are returned in any particular order. This behavior matches
 the behavior of Hashes in Ruby 1.8 and earler. In fact, some file systems store
 or index name-to-inode mappings in a hash structure on disk.
 
-All dirents within one directory belong to the same device, and often the same
-physical device[fn:17], so only the inode number is stored in the dirent.
+All dentries (except "..") within one directory belong to the same device, and
+often the same physical device[fn:17], so only the inode number is stored in the
+dirent.
 ** Creating and Removing Directories
 Creating directories requires the [[shell:man%202%20mkdir][mkdir(2)]] syscall provided by the Ruby
 Dir.mkdir method.
