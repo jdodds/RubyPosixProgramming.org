@@ -493,6 +493,65 @@ object for the file descriptor belonging to the IO/File object. IO#Stat makes
 the [[shell:man%202%20fstat][fstat(2)]] system call instead of [[shell:man%202%20stat][stat(2)]].
 
 File::Stat is the Ruby equivalent/wrapper of the "struct stat" seen by C programmers.
+* An Introduction to the Unix Pipe
+The Unix pipe is an example of an anonymous file. Unlike regular files and
+directories, anonymous files do not exist on the filesystem and do not persist
+across reboots. Only the process that creates the anonymous file (and its
+descendants) can access anonymous files. Anonymous files only persist until the
+last process using it closes it.
+
+At its heart, the Unix pipe is just like a pipe in plumbing: a one-way buffer
+for transporting ayload from one end to another.
+
+It is implemented as a circular ring buffer in the kernel:
+
+#+begin_example
+     user space | kernel space
+----------------|--------------------------
+data in --> fd[writer] ->- file[writer] -->\
+                |                           \
+                |                            [buffer]
+                |                            /
+data out <-- fd[reader] -<- file[reader] <--/
+#+end_example
+
+The buffer is created by the [[shell:man%202%20pipe][pipe(2)]] system call and persists until both files
+are closed. In Ruby, the IO.pipe method calls [[shell:man%202%20pipe][pipe(2)]] and returns an array of
+two Ruby IO objects, a reader and writer:
+
+#+begin_src ruby
+reader, writer = IO.pipe # kernel creates internal buffer
+#+end_src
+
+Writing can be accomplished by making the [[shell:man%202%20write][write(2)]] syscall, the writer IO object
+should default to IO#sync=true at creation.
+
+#+begin_src ruby
+writer.write("HELLO")
+#+end_src
+
+Reading can be accomplished by making the [[shell:man%202%20read][read(2)]] syscall.
+
+#+begin_src ruby
+reader.read(5) # => "HELLO"
+#+end_src
+
+Finally, the kernel memory for the buffer is released after both file objects
+(through file descriptors and IO) are closed:
+
+#+begin_src ruby
+writer.close
+reader.close
+# kernel frees the buffer
+#+end_src
+
+As with regular files, pipes operate on byte streams and leave higher-level
+functionality like encoding to user sspace.
+
+Pipes also have important atomicity requirements standardized by POSIX. Given
+the importance of pipes in Unix programming, we will revisit and give pipes much
+more coverage in the future.
+
 * Footnotes
 [fn:1] or more
 
