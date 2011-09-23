@@ -551,6 +551,115 @@ functionality like encoding to user sspace.
 Pipes also have important atomicity requirements standardized by POSIX. Given
 the importance of pipes in Unix programming, we will revisit and give pipes much
 more coverage in the future.
+* Directories on the Filesystem
+Directories are containers for files in addition to being files. Similarly, Ruby
+Hashes are containers for Objects in addition to being objects.
+
+The contents of the "/home/johndoe/" directory could be expressed as the
+following Ruby pseudocode:
+
+#+begin_src ruby
+  root = {
+    "home" => {
+      "johndoe" => {
+        ".bashrc" => Inode[123],
+        ".vimrc" => Inode[456],
+        ".mutt" => {
+          ".muttrc" => Inode[789]
+        }
+      }
+    }
+  }
+#+end_src
+
+It's impossible for two identical file names to appear in the same directory at
+the same time.
+** Directory Entries
+As hashes are composed of key-value pairs, directories are composed of directory
+entries, or "dirent" structures which store file names and inode numbers. Like
+"struct stat" information, the "struct dirent" exposed to user space contains
+only the standardized, common information for user space, not the actual,
+private information in the kernel or file system.
+
+Ruby does not expose the dirent structure in any way (the standard C library
+does), but one could express the dirent structure with the following Ruby
+Struct:
+
+#+begin_src ruby
+  Dirent = Struct.new(:d_name, :d_ino)
+  Dirent.new(".bashrc", 123)
+#+end_src
+** Reading Dirents
+The Ruby Dir class handles reading directories, but only exposes names to the
+user.
+
+There are no portable syscalls for reading dirents from a directory, only
+standardized *library* functions such as [[shell:man%203%20readdir][readdir(3)]] and [[shell:man%203%20readdir_r][readdir_r(3)]]. These
+library functions are wrappers for non-portable system calls.
+
+Furthermore, common functionality like partial name matching (globbing) is
+handled by user space. Proper Unix file systems have no notion of encoding or
+case-sensitivity in kernel space, thus inexact name matching rules need to be
+applied in user space.
+
+Sorting is also done in user space. The standard C library functions never
+guarantee entries are returned in any particular order. This behavior matches
+the behavior of Hashes in Ruby 1.8 and earler. In fact, some file systems store
+or index name-to-inode mappings in a hash structure on disk.
+
+All dirents within one directory belong to the same device, and often the same
+physical device[fn:17], so only the inode number is stored in the dirent.
+** Creating and Removing Directories
+Creating directories requires the [[shell:man%202%20mkdir][mkdir(2)]] syscall provided by the Ruby
+Dir.mkdir method.
+
+Once created, it is possible to use [[shell:man%202%20open][open(2)]] to "open" a directory like a regular
+file and IO#stat it.
+
+The [[shell:man%202%20rmdir][rmdir(2)]] syscall is used to remove directories, and is provided by Dir.rmdir
+in Ruby.
+
+High-level wrappers like FileUtils.mkpath (or "[[shell:man%201%20mkdir][mkdir(1)]] -p") and
+FileUtils.rmtree (or "[[man%201%20rm][rm(1)]] -r") need to invoke the appropriate syscall for
+every entry they wish to create or remove.
+
+On modern Unicies, it is not possible to create hard links for
+directories. Allowing directoriy hard links would lead to infinite recursion
+loops when traversing directories.
+
+Thus, the File::Stat#nlink field for directories shows the number of entries the
+directory contains.
+** "." and ".." entries
+Every directory contains an entry for itself, ".", and to its parent, "..".
+
+The root "/" directory is specal and is its own parent.
+** [[man%202%20rename][rename(2)]]
+The File.rename method wraps the [[shell:man%202%20rename][rename(2)]] syscall to change the name of a file
+within the same device. [[man%202%20rename][rename(2)]] can occur within the same or different
+directories as long as the source and destination exist on the same device.
+
+For regular files:
+
+#+begin_src ruby
+File.rename("foo", "bar")
+#+end_src
+
+Is roughly equivalent to:
+
+#+begin_src ruby
+File.link("foo", "bar")
+File.unlink("foo")
+#+end_src
+
+However, it is impossible (on a POSIX-compliant filesystem) for userspace to
+access both "foo" and "bar" at the same time when using
+File.rename. Additionally, File.rename will work on directories whereas
+File.link and File.unlink do not work on directories.
+
+Commands like [[man%201%20mv][mv(1)]] will use [[shell:man%202%20rename][rename(2)]] if both the source and destination exist
+on the same device. This makes [[man%201%20mv][mv(1)]] very fast in cases where it works on the
+same device, but slow and non-atomic if the source and destination need to cross
+devices.
 
 * Footnotes
 [fn:1] or more
@@ -589,3 +698,6 @@ Ruby VMs within a single process
 bad idea.
 
 [fn:16] database servers like PostGreSQL come to mind
+
+[fn:17] There exists some union filesystems which break this assumption, however
+they are uncommon and often restricted to read-only access.
