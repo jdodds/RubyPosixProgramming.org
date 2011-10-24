@@ -509,9 +509,9 @@ It is implemented as a circular ring buffer in the kernel:
      user space | kernel space
 ----------------|--------------------------
 data in --> fd[writer] ->- file[writer] -->\
-                |                           \
-                |                            [buffer]
-                |                            /
+                | \        |
+                | [buffer] |
+                | /        |
 data out <-- fd[reader] -<- file[reader] <--/
 #+end_example
 
@@ -740,8 +740,48 @@ you're tracing syscalls. This is because C libraries can work with the kernel to
 optimize away the syscalls for [[shell:man%202%20gettimeofday][gettimeofday(2)]] and [[shell:man%202%20clock_gettime][clock_gettime(2)]]. These
 implementations may trade accuracy for speed, but may be disabled by the
 administrator if accuracy is more important than speed.
-* Footnotes
+* IO#dup and the [[shell:man%202%20dup][dup(2)]] system call
+IO#dup is Object#dup in Ruby: it creates a shallow copy of an existing
+object. To create a shallow copy, the IO#initialize_copy callback method
+performs the [[shell:man%202%20dup][dup(2)]] syscall on the underlying file descriptor the IO object
+wraps.
 
+Like Object#dup in Ruby, [[shell:man%202%20dup][dup(2)]] is a shallow clone that does not copy the
+underlying open file object in the kernel, but creates a new reference to an
+existing kernel object.
+
+Thus, two (or more) file descriptors in the same process can refer to the same
+open file in the kernel.
+
+Before calling IO#dup, we have a 1:1:1 relationship:
+
++ one Ruby IO object
++ one file descriptor
++ one open file object in the kernel
+
+
+After we call IO#dup, we have a 2:2:1 relationship:
+
++ two Ruby IO objects
++ two file descriptors
++ one file object in the kernel
+
+
+IO#dup can be called on the same IO object any number of times, so there may be
+an N:N:1 relationship as long as the process (and system) resource limits are
+not exceeded.
+
+Most kernel-level (but not user space) changes to one IO object are immediately
+visible in the IO object(s) it was copied from (or copied to).
+** Effect on IPC
+IO#deup means IO#close / [[shell:man%202%20close][close(2)]] will only remove a *reference* to the file
+object in the kernel. Only when the last file descriptor for a given file object
+is closed is the actual file object closed and released in the kernel.
+
+For applications relying on receiving an end-of-file condition (from a socket or
+pipe), IO#dup[fn:21] can (sometimes inadvertantly) prevent the end-of-file
+condition from being reached in the reader.
+* Footnotes
 [fn:1] or more
 
 [fn:2] however, "POSIX-compliant" does not guarantee a system is Unix or even
@@ -790,3 +830,5 @@ syscalls to read those files.
 [fn:20] You're not guaranteed that this level of accuracy is supported by your
 kernel or your hardware. Consult your OS and hardware documentation for more
 information.
+
+[fn:21] and similar functions, like fork
