@@ -781,6 +781,66 @@ is closed is the actual file object closed and released in the kernel.
 For applications relying on receiving an end-of-file condition (from a socket or
 pipe), IO#dup[fn:21] can (sometimes inadvertantly) prevent the end-of-file
 condition from being reached in the reader.
+* Unix Processes and their Attributes
+Processes are kernel objects that run user space code. As we've established
+before, each Unix process is identified by an integer process identifier (PID)
+and has a file descriptor table.
+** PIDs
+Each process knows two PIDs: its own and its parent's (PPID).
+
+Process.pid and $$ are wrappers for the [[shell:man%202%20getpid][getpid(2)]] syscall and Process.ppid is a
+wrapper for [[shell:man%202%20getppid][getppid(2)]]. While the PID of a process never changes, its PPID may change.
+** $0 / $PROGRAM_NAME
+Each process has a name. This variable may be reassigned to change the name of
+this process in the output of tools like [[shell:man%201%20ps][ps(1)]].
+
+Ruby does not expose $EXECUTABLE_NAME ($^X) like Perl does, however
+$PROGRAM_NAME is set to the executable name for Ruby programs at startup.
+** ARGV
+This is an Array of command-line arguments given to a process ARGV[0] in Ruby is
+the first argument given to the executable, not the executable name, unlike in
+languages like C where it is the name of the executable.
+
+Modifying this array will not affect the name of the process in tools like
+[[shell:man%201%20ps][ps(1)]]. Command-line option parsing libraries like 'optparse' and 'getoptlong' in
+the Ruby standard library may modify ARGV.
+** Signal mask/handlers
+Ruby implementations have internal system-level signal handlers that may later
+dispatch Ruby code (registered via Signal.trap). Signal handlers written in Ruby
+are not subject to the limitations of system-level signal handlers.
+** ENV
+This Hash-like object holds process environment variables. Environment variables
+are global to the process and are used to share information with system
+libraries and child processes in a language-independent manner.
+
+Null-terminated C strings are mapped to Ruby Strings in both the keys and values
+of this Hash-like object.
+
+While the system environment appears Hash-like, it is not exposed to user space
+so it does not have the same performance or algorithmic complexity as a Ruby Hash.
+** Working Directory (Dir.pwd, Dir.chdir)
+All processes have a working directory that they run in.
+** Process.times
+Each process keeps track of CPU time spent in user space and the system (kernel)
+as well as the accumelated times of its children.
+
+Process.times is used to implement the Benchmark module in the Rby standard library.
+** Usage counters ([[shell:man%202%20getrusage][getrusage(2)]])
+Unfortunately, there is no Ruby api for [[shell:man%202%20getrusage][getrusage(2)]]. Some GC implementations
+may se it to provide profiling statistics
+** Process.getrlimit / Process.setrlimit
+These get and set process resource limits such as the maximum number of open
+file descriptors, resident set size, niceness, CPU time, etc.
+
+They are wrappers for the respective [[shell:man%202%20getrlimit][getrlimit(2)]] and [[shell:man%202%20setrlimit][setrlimit(2)]] syscalls.
+** User IDs / Group IDs
+Each process has a real, effective, and saved UID and GIDs.
+
+Process::UID.change_privilege and Process::GID.change_privilege are the most
+portable and easiest ways to change the UID(s) and GID(s) of a process.
+** umask (File.umask)
+The umask is the file mode creation mask of the process. This governs the
+filesystem permissions of newly-created files (File.open) and directories (Dir.mkdir).
 * Footnotes
 [fn:1] or more
 
