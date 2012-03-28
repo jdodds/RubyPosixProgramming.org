@@ -1,5 +1,5 @@
 * License:
-[[http://www.gnu.org/licenses/gpl-3.0.txt][GPLv3]] (or later, at the discretion of Eric Wong)
+[[http://www.gnu.org/licenses/gpl-3.0.txt][GPLv3]] (or later, at the discretion of Eric Wong), except where noted.
 * Prerequisite Knowledge / Conventions used
 ** Prerequisite Knowledge
 + You should know basic Ruby syntax.
@@ -1059,6 +1059,10 @@ source code:
 $ git clone git://git.0pointer.de/pulseaudio
 $ $EDITOR src/daemon/cpulimit.c
 #+end_example
+** License
+This section is not covered by the GPL3, it is CC0: To the extent possible under
+law, Eric Wong has waived all copyright and related or neighboring rights to the
+contents of this section.
 
 
 
